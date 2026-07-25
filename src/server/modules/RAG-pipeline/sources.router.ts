@@ -1,29 +1,26 @@
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import multer from "multer";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "../../common/config/db/index.js";
 import { userTable, sourceTable } from "../../common/config/db/schema.js";
 import { ensureUser, checkSourceLimit } from "../auth/middleware.js";
 
-// ── Parsers ───────────────────────────────────────────────────────────────────
 import { parsePDF } from "./indexing/parsers/pdf-parser.js";
 import { parseVTT } from "./indexing/parsers/vtt-parser.js";
 import { parseWebsite } from "./indexing/parsers/website-parser.js";
 import { parseYouTube } from "./indexing/parsers/yt-parser.js";
 
-// ── Chunkers ──────────────────────────────────────────────────────────────────
 import { chunkPDF } from "./indexing/chunking/pdf-chunking.js";
 import { chunkVTT } from "./indexing/chunking/vtt-chunking.js";
 import { chunkWebsite } from "./indexing/chunking/website-chunking.js";
 import { chunkYouTube } from "./indexing/chunking/yt-chunking.js";
 
-// ── Embed ─────────────────────────────────────────────────────────────────────
 import { embedAndStore, deleteSourceVectors } from "./indexing/embed.js";
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
@@ -33,11 +30,11 @@ const urlSourceSchema = z.object({
   type: z.enum(["youtube", "website"]),
 });
 
-// ── Multer — file upload config ───────────────────────────────────────────────
+// ── Multer ────────────────────────────────────────────────────────────────────
 
 const upload = multer({
   dest: "uploads/",
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: (_req, file, cb) => {
     const allowed = [".pdf", ".vtt"];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -60,6 +57,7 @@ sourcesRouter.post(
   upload.single("file"),
   async (req: Request, res: Response): Promise<void> => {
     const { userId } = getAuth(req);
+
     if (!userId || !req.file) {
       res.status(400).json({ error: "Missing file or auth" });
       return;
@@ -71,7 +69,7 @@ sourcesRouter.post(
     const filePath = req.file.path;
     const sourceType = ext === ".pdf" ? "pdf" : "vtt";
 
-    // Insert source as "indexing"
+    // Insert source row as "indexing"
     await db.insert(sourceTable).values({
       id: sourceId,
       userId,
@@ -80,15 +78,16 @@ sourcesRouter.post(
       status: "indexing",
     });
 
-    // Increment user source count
+    // Increment source count
     await db
       .update(userTable)
-      .set({ sourceCount: db.$count(sourceTable, eq(sourceTable.userId, userId)) as unknown as number })
+      .set({ sourceCount: sql`${userTable.sourceCount} + 1` })
       .where(eq(userTable.id, userId));
 
+    // Respond immediately — indexing happens in background
     res.status(202).json({ sourceId, status: "indexing" });
 
-    // ── Background indexing (non-blocking) ────────────────────────────────────
+    // ── Background indexing ────────────────────────────────────────────────────
     (async () => {
       try {
         let chunks;
@@ -109,17 +108,16 @@ sourcesRouter.post(
           .set({ status: "indexed" })
           .where(eq(sourceTable.id, sourceId));
       } catch (err) {
-        console.error("[sources] Indexing failed:", err);
+        console.error("[sources] File indexing failed:", err);
         await db
           .update(sourceTable)
           .set({ status: "failed" })
           .where(eq(sourceTable.id, sourceId));
       } finally {
-        // Clean up temp upload file
-        fs.unlink(filePath, () => {});
+        fs.unlink(filePath, () => {}); // cleanup temp file
       }
     })();
-  }
+  },
 );
 
 // ── POST /sources/url — Add YouTube or Website ────────────────────────────────
@@ -130,7 +128,10 @@ sourcesRouter.post(
   checkSourceLimit,
   async (req: Request, res: Response): Promise<void> => {
     const { userId } = getAuth(req);
-    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const parsed = urlSourceSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -148,6 +149,11 @@ sourcesRouter.post(
       type,
       status: "indexing",
     });
+
+    await db
+      .update(userTable)
+      .set({ sourceCount: sql`${userTable.sourceCount} + 1` })
+      .where(eq(userTable.id, userId));
 
     res.status(202).json({ sourceId, status: "indexing" });
 
@@ -178,54 +184,74 @@ sourcesRouter.post(
           .where(eq(sourceTable.id, sourceId));
       }
     })();
-  }
+  },
 );
 
 // ── GET /sources — List user's sources ───────────────────────────────────────
 
-sourcesRouter.get("/", ensureUser, async (req: Request, res: Response): Promise<void> => {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+sourcesRouter.get(
+  "/",
+  ensureUser,
+  async (req: Request, res: Response): Promise<void> => {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
-  const sources = await db
-    .select()
-    .from(sourceTable)
-    .where(eq(sourceTable.userId, userId))
-    .orderBy(sourceTable.createdAt);
+    const sources = await db
+      .select()
+      .from(sourceTable)
+      .where(eq(sourceTable.userId, userId))
+      .orderBy(sourceTable.createdAt);
 
-  res.json({ sources });
-});
+    res.json({ sources });
+  },
+);
 
 // ── DELETE /sources/:id — Remove a source ────────────────────────────────────
 
-sourcesRouter.delete("/:id", ensureUser, async (req: Request, res: Response): Promise<void> => {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+sourcesRouter.delete(
+  "/:id",
+  ensureUser,
+  async (req: Request, res: Response): Promise<void> => {
+    const { userId } = getAuth(req);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
-  const sourceId = req.params.id;
+    const sourceId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+    if (!sourceId) {
+      res.status(400).json({ error: "Missing source id" });
+      return;
+    }
 
-  const [source] = await db
-    .select()
-    .from(sourceTable)
-    .where(eq(sourceTable.id, sourceId!))
-    .limit(1);
+    const [source] = await db
+      .select()
+      .from(sourceTable)
+      .where(eq(sourceTable.id, sourceId))
+      .limit(1);
 
-  if (!source || source.userId !== userId) {
-    res.status(404).json({ error: "Source not found" });
-    return;
-  }
+    if (!source || source.userId !== userId) {
+      res.status(404).json({ error: "Source not found" });
+      return;
+    }
 
-  // Delete from Pinecone
-  await deleteSourceVectors(userId, sourceId!);
+    // Delete vectors from Pinecone
+    await deleteSourceVectors(userId, sourceId);
 
-  // Delete from DB
-  await db.delete(sourceTable).where(eq(sourceTable.id, sourceId!));
+    // Delete row from DB
+    await db.delete(sourceTable).where(eq(sourceTable.id, sourceId));
 
-  // Decrement source count
-  await db
-    .update(userTable)
-    .set({ sourceCount: db.$count(sourceTable, eq(sourceTable.userId, userId)) as unknown as number })
-    .where(eq(userTable.id, userId));
+    // Decrement source count (never go below 0)
+    await db
+      .update(userTable)
+      .set({ sourceCount: sql`GREATEST(${userTable.sourceCount} - 1, 0)` })
+      .where(eq(userTable.id, userId));
 
-  res.json({ success: true });
-});
+    res.json({ success: true });
+  },
+);

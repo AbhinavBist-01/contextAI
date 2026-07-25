@@ -1,0 +1,178 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #030303;
+    color: #f4f4f5;
+  }
+}
+
+/* Custom Grid Pattern Background */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+.bg-radial-glow {
+  background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.08) 0%, rgba(3, 3, 3, 0.95) 70%);
+}
+
+/* Glassmorphism utilities */
+.glass-panel {
+  background: rgba(14, 14, 18, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-nav {
+  background: rgba(8, 8, 10, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.05);
+}
+
+.glass-btn {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.2s ease;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Explicit Clerk Dark Theme & Placeholder CSS Overrides */
+.cl-card, .cl-main, .cl-rootBox {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+
+.cl-headerTitle {
+  color: #ffffff !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-weight: 700 !important;
+}
+
+.cl-headerSubtitle {
+  color: #a1a1aa !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cl-formFieldLabel {
+  color: #e4e4e7 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12px !important;
+}
+
+.cl-formFieldInput {
+  background-color: #121216 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 13px !important;
+  padding: 10px 14px !important;
+}
+
+.cl-formFieldInput::placeholder {
+  color: #888894 !important;
+  opacity: 1 !important;
+}
+
+.cl-formFieldInput:focus {
+  border-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2) !important;
+}
+
+.cl-socialButtonsBlockButton {
+  background-color: #121216 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  border-radius: 12px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: #1c1c22 !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12px !important;
+}
+
+.cl-dividerLine {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.cl-dividerText {
+  color: #71717a !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cl-formButtonPrimary {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  transition: all 0.2s ease !important;
+}
+
+.cl-formButtonPrimary:hover {
+  background-color: #e4e4e7 !important;
+}
+
+.cl-footerActionLink {
+  color: #ffffff !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-weight: 600 !important;
+}
+
+.cl-footerActionText {
+  color: #a1a1aa !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.cl-internal-ph57gq, .cl-internal-b3fm6y, .cl-footer {
+  background-color: transparent !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #030303;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}

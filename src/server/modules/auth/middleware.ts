@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { db } from "../common/config/db/index.js";
-import { userTable } from "../common/config/db/schema.js";
+import { db } from "../../common/config/db/index.js";
+import { userTable } from "../../common/config/db/schema.js";
 import { eq } from "drizzle-orm";
 
 const MAX_REQUESTS_PER_DAY = 10;
