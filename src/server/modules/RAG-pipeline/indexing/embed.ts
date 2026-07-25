@@ -17,7 +17,8 @@ const index = pinecone.index(process.env.PINECONE_INDEX_NAME!);
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const EMBEDDING_MODEL = "text-embedding-3-small"; // 1536 dimensions
+const EMBEDDING_MODEL = "text-embedding-3-small";
+const VECTOR_DIMENSION = Number(process.env.VECTOR_DIMENSION) || 1024;
 const BATCH_SIZE = 100; // Pinecone upsert limit per request
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ export async function embedAndStore(options: EmbedAndStoreOptions): Promise<void
 
     const embeddingResponse = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
+      dimensions: VECTOR_DIMENSION,
       input: texts,
     });
 

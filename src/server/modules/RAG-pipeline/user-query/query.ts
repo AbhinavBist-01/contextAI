@@ -17,6 +17,7 @@ const index = pinecone.index(process.env.PINECONE_INDEX_NAME!);
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
+const VECTOR_DIMENSION = Number(process.env.VECTOR_DIMENSION) || 1024;
 const TOP_K = 5; // number of relevant chunks to retrieve
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ async function buildQueryVector(
 ): Promise<number[]> {
   const response = await openai.embeddings.create({
     model: EMBEDDING_MODEL,
+    dimensions: VECTOR_DIMENSION,
     input: [userQuery, hydeAnswer],
   });
 
