@@ -1,27 +1,33 @@
+import "dotenv/config";
 import express from "express";
-import { clerkMiddleware, clerkClient, getAuth } from "@clerk/express";
+import cors from "cors";
+import { clerkMiddleware } from "@clerk/express";
+
+import { sourcesRouter } from "./modules/RAG-pipeline/sources.router.js";
+import { queryRouter } from "./modules/RAG-pipeline/query.router.js";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT ?? 8000;
 
+// ── Global Middleware ─────────────────────────────────────────────────────────
+
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(express.json());
 app.use(clerkMiddleware());
 
-app.get("/protected", async (req, res) => {
-  // Use `getAuth()` to get the user's `userId`
-  const { isAuthenticated, userId } = getAuth(req);
+// ── Routes ────────────────────────────────────────────────────────────────────
 
-  if (!isAuthenticated) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+app.use("/sources", sourcesRouter);
+app.use("/query", queryRouter);
 
-  // Use the `getUser()` method to get the user's User object
-  const user = await clerkClient.users.getUser(userId);
+// ── Health check ──────────────────────────────────────────────────────────────
 
-  res.json({ user });
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
 });
 
-// Start the server and listen on the specified port
+// ── Start ─────────────────────────────────────────────────────────────────────
+
 app.listen(PORT, () => {
-  console.log(`Example app listening at http://localhost:${PORT}`);
+  console.log(`✅ ContextAI server running at http://localhost:${PORT}`);
 });
