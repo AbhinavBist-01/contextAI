@@ -21,7 +21,12 @@ import {
   Bot,
   User,
   Zap,
-  Info
+  Info,
+  Clock,
+  ChevronRight,
+  PanelRightClose,
+  PanelRightOpen,
+  Maximize2
 } from 'lucide-react';
 
 interface Source {
@@ -55,6 +60,26 @@ interface WorkspacePageProps {
   onBackToHome: () => void;
 }
 
+// Format seconds into MM:SS timestamp e.g. 75.4 -> 01:15
+function formatTimestamp(secondsStr?: string): string {
+  if (!secondsStr) return '';
+  const totalSec = Math.floor(parseFloat(secondsStr));
+  if (isNaN(totalSec)) return '';
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Generate YouTube deep link with ?t=...s
+function getYouTubeLink(url?: string, startTime?: string): string {
+  if (!url) return '#';
+  const startSec = Math.floor(parseFloat(startTime || '0'));
+  if (url.includes('?v=')) {
+    return `${url}&t=${startSec}s`;
+  }
+  return `${url}?t=${startSec}s`;
+}
+
 export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) => {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -73,6 +98,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState<number>(0);
   const [notebookTitle, setNotebookTitle] = useState('My AI Knowledge Base');
+  
+  // Right Sidebar Citations State
+  const [activeCitations, setActiveCitations] = useState<Citation[]>([]);
+  const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Helper to build headers with Clerk Bearer token
@@ -115,7 +147,15 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
       const res = await fetch('/api/rag/query/history', { headers });
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        const history: ChatMessage[] = data.messages || [];
+        setMessages(history);
+
+        // Auto-select citations from the latest assistant message if available
+        const lastAssistant = [...history].reverse().find(m => m.role === 'assistant' && m.citations && m.citations.length > 0);
+        if (lastAssistant && lastAssistant.citations) {
+          setActiveCitations(lastAssistant.citations);
+          setActiveMessageId(lastAssistant.id);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch history:', err);
@@ -258,21 +298,37 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
         throw new Error(data.error || 'Failed to get answer');
       }
 
+      const citations: Citation[] = data.citations || [];
+
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.answer,
-        citations: data.citations || [],
+        citations,
         usedRAG: data.usedRAG
       };
 
       setMessages(prev => [...prev, assistantMsg]);
       setRequestCount(prev => prev + 1);
+
+      // Automatically update citations state
+      if (citations.length > 0) {
+        setActiveCitations(citations);
+        setActiveMessageId(assistantMsg.id);
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to generate response');
     } finally {
       setIsLoadingQuery(false);
     }
+  };
+
+  // Open Inspector for a specific citation pill
+  const handleOpenCitationInspector = (citations: Citation[], msgId: string, idx?: number) => {
+    setActiveCitations(citations);
+    setActiveMessageId(msgId);
+    setActiveCitationIndex(idx !== undefined ? idx : null);
+    setIsRightSidebarOpen(true);
   };
 
   return (
@@ -306,12 +362,20 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
           </div>
         </div>
 
-        {/* Right: Request Counter & User Account Badge */}
+        {/* Right: Toggle Right Panel, Counter & User Account Badge */}
         <div className="flex items-center space-x-4">
           <div className="hidden sm:flex items-center space-x-2 bg-white/5 border border-white/10 px-3 py-1 rounded-xl font-mono text-xs text-zinc-300">
             <Zap className="w-3.5 h-3.5 text-emerald-400" />
             <span>{requestCount}/10 Queries Today</span>
           </div>
+
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            title={isRightSidebarOpen ? "Close Citations Drawer" : "Open Citations Drawer"}
+          >
+            {isRightSidebarOpen ? <PanelRightClose className="w-4 h-4 text-emerald-400" /> : <PanelRightOpen className="w-4 h-4 text-zinc-400" />}
+          </button>
 
           <div className="flex items-center space-x-3 pl-2 border-l border-white/10">
             <div className="text-right hidden md:block">
@@ -330,11 +394,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
 
       </header>
 
-      {/* ── MAIN WORKSPACE BODY ────────────────────────────────────────── */}
+      {/* ── MAIN WORKSPACE THREE-COLUMN BODY ────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden relative">
         
-        {/* ── SIDEBAR (SOURCES MANAGEMENT) ────────────────────────────── */}
-        <aside className="w-72 md:w-80 border-r border-white/10 bg-[#050507] p-4 flex flex-col justify-between shrink-0 overflow-y-auto">
+        {/* ── LEFT SIDEBAR (SOURCES MANAGEMENT) ────────────────────────── */}
+        <aside className="w-64 lg:w-72 border-r border-white/10 bg-[#050507] p-4 flex flex-col justify-between shrink-0 overflow-y-auto hidden md:flex">
           
           <div className="space-y-5">
             
@@ -384,7 +448,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
                     >
                       <div className="flex items-center space-x-3 min-w-0 pr-2">
                         
-                        {/* Type Icon */}
                         <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                           {s.type === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-400" />}
                           {s.type === 'vtt' && <FileText className="w-3.5 h-3.5 text-amber-400" />}
@@ -392,11 +455,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
                           {s.type === 'youtube' && <Youtube className="w-3.5 h-3.5 text-red-500" />}
                         </div>
 
-                        {/* Title & Hover Badge */}
                         <div className="min-w-0 flex-1">
                           <div className="font-mono text-xs text-white truncate font-medium">{s.name}</div>
                           
-                          {/* Hover Tooltip / Status indicator */}
                           <div className="flex items-center space-x-1.5 pt-0.5">
                             {isIndexing && (
                               <span className="flex items-center text-[10px] font-mono text-amber-400">
@@ -423,7 +484,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
 
                       </div>
 
-                      {/* Delete Action */}
                       <button
                         onClick={() => handleDeleteSource(s.id)}
                         className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-colors cursor-pointer shrink-0"
@@ -440,7 +500,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
 
           </div>
 
-          {/* Sidebar Footer Info */}
           <div className="pt-4 border-t border-white/10 text-[10px] font-mono text-zinc-500 space-y-1">
             <div className="flex items-center justify-between">
               <span>RAG Mode:</span>
@@ -454,11 +513,11 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
 
         </aside>
 
-        {/* ── CHAT MAIN INTERFACE (CHATGPT / NOTEBOOKLM STYLE) ──────────── */}
+        {/* ── CENTER CHAT WORKSPACE ────────────────────────────────────── */}
         <section className="flex-1 flex flex-col bg-[#030303] relative overflow-hidden">
           
           {/* Messages Scroll Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-4xl mx-auto w-full">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-3xl mx-auto w-full">
             
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 pt-12">
@@ -467,10 +526,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
                 </div>
                 <h3 className="text-2xl font-mono font-bold text-white">Ask Anything About Your Sources</h3>
                 <p className="text-xs font-mono text-zinc-400 max-w-md">
-                  Upload PDFs, Web Docs, or YouTube links in the sidebar to perform HyDE vector search and get zero-hallucination grounded responses.
+                  Upload PDFs, Web Docs, or YouTube links to perform HyDE vector search and click source pills to expand full citations.
                 </p>
 
-                {/* Quick Prompt Ideas */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg w-full pt-4 font-mono text-xs">
                   <button 
                     onClick={() => setInputQuery("Summarize the key findings from my uploaded documents.")}
@@ -479,28 +537,28 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
                     💡 "Summarize the key findings from my sources..."
                   </button>
                   <button 
-                    onClick={() => setInputQuery("What are the architectural steps in HyDE expansion?")}
+                    onClick={() => setInputQuery("What are the main concepts in my YouTube videos?")}
                     className="p-3 bg-white/5 border border-white/10 hover:border-white/30 rounded-xl text-left text-zinc-300 hover:text-white transition-all"
                   >
-                    🔍 "Explain the HyDE vector expansion steps..."
+                    🎥 "What are the main concepts in my videos?"
                   </button>
                 </div>
               </div>
             ) : (
               messages.map(m => {
                 const isUser = m.role === 'user';
+                const hasCitations = m.citations && m.citations.length > 0;
+
                 return (
                   <div key={m.id} className={`flex items-start space-x-3 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
                     
-                    {/* Avatar */}
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                       isUser ? 'bg-white text-black' : 'bg-white/10 text-white border border-white/20'
                     }`}>
                       {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-emerald-400" />}
                     </div>
 
-                    {/* Message Card */}
-                    <div className={`max-w-2xl space-y-3 ${isUser ? 'items-end' : 'items-start'}`}>
+                    <div className={`max-w-xl space-y-3 ${isUser ? 'items-end' : 'items-start'}`}>
                       <div className={`p-4 rounded-2xl font-sans text-sm leading-relaxed ${
                         isUser 
                           ? 'bg-white text-black font-medium shadow-md' 
@@ -509,26 +567,47 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
                         {m.content}
                       </div>
 
-                      {/* Sources Cited Accordion/Cards */}
-                      {m.citations && m.citations.length > 0 && (
-                        <div className="bg-zinc-950/90 border border-white/10 rounded-xl p-3.5 space-y-2 font-mono text-xs">
-                          <div className="flex items-center space-x-1.5 text-emerald-400 text-[11px] font-bold">
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>SOURCES CITED ({m.citations.length})</span>
+                      {/* ── INLINE HORIZONTAL SOURCES PILLS ROW ─────────────── */}
+                      {hasCitations && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="text-[10px] font-mono text-zinc-500 uppercase font-bold flex items-center">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400 mr-1" />
+                            <span>Sources Used (Click to open full inspector):</span>
                           </div>
 
-                          <div className="space-y-2 pt-1">
-                            {m.citations.map((c, idx) => (
-                              <div key={idx} className="bg-white/5 p-2.5 rounded-lg border border-white/10 space-y-1">
-                                <div className="flex items-center justify-between text-white font-bold text-[11px]">
-                                  <span>{c.sourceName}</span>
-                                  <span className="text-[10px] text-zinc-500 uppercase">{c.sourceType}</span>
-                                </div>
-                                <p className="text-zinc-400 text-[11px] line-clamp-2 italic">
-                                  "{c.text}"
-                                </p>
-                              </div>
-                            ))}
+                          <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                            {m.citations!.map((c, idx) => {
+                              const isYT = c.sourceType === 'youtube';
+                              const startTimeFormatted = formatTimestamp(c.startTime);
+
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleOpenCitationInspector(m.citations!, m.id, idx)}
+                                  className="group flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0d0d12] border border-white/15 hover:border-white/40 hover:bg-white/10 text-zinc-200 hover:text-white transition-all cursor-pointer shadow-sm"
+                                >
+                                  {isYT ? (
+                                    <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                  ) : c.sourceType === 'pdf' ? (
+                                    <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                  ) : (
+                                    <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                  )}
+
+                                  <span className="truncate max-w-[150px] font-medium text-[11px]">
+                                    {c.sourceName || 'Source'}
+                                  </span>
+
+                                  {isYT && startTimeFormatted && (
+                                    <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-semibold border border-red-500/20">
+                                      {startTimeFormatted}
+                                    </span>
+                                  )}
+
+                                  <Maximize2 className="w-3 h-3 text-zinc-500 group-hover:text-white transition-colors" />
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -539,7 +618,6 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
               })
             )}
 
-            {/* Loading Indicator */}
             {isLoadingQuery && (
               <div className="flex items-start space-x-3">
                 <div className="w-8 h-8 rounded-xl bg-white/10 text-white border border-white/20 flex items-center justify-center font-bold">
@@ -555,9 +633,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
             <div ref={chatEndRef} />
           </div>
 
-          {/* ── CHAT INPUT FORM ────────────────────────────────────────── */}
+          {/* Chat Input Form */}
           <div className="p-4 md:p-6 border-t border-white/10 bg-[#050507]">
-            <form onSubmit={handleSendQuery} className="max-w-4xl mx-auto flex items-center space-x-3">
+            <form onSubmit={handleSendQuery} className="max-w-3xl mx-auto flex items-center space-x-3">
               <input
                 type="text"
                 value={inputQuery}
@@ -577,7 +655,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
             </form>
 
             {errorMsg && (
-              <div className="max-w-4xl mx-auto mt-2 text-rose-400 font-mono text-xs flex items-center">
+              <div className="max-w-3xl mx-auto mt-2 text-rose-400 font-mono text-xs flex items-center">
                 <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -585,6 +663,131 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
           </div>
 
         </section>
+
+        {/* ── RIGHT SIDEBAR DRAWER (EXPANDED CITATION INSPECTOR) ───────── */}
+        {isRightSidebarOpen && (
+          <aside className="w-80 lg:w-96 border-l border-white/10 bg-[#060608] p-5 flex flex-col justify-between shrink-0 overflow-y-auto z-20 shadow-2xl animate-fadeIn">
+            
+            <div className="space-y-6">
+              
+              {/* Right Sidebar Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+                  <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">Citation Inspector</span>
+                </div>
+                <button
+                  onClick={() => setIsRightSidebarOpen(false)}
+                  className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Citations List */}
+              {activeCitations.length === 0 ? (
+                <div className="p-8 border border-dashed border-white/10 rounded-2xl text-center space-y-3">
+                  <Sparkles className="w-8 h-8 text-zinc-600 mx-auto" />
+                  <div className="font-mono text-xs text-white font-bold">No Citation Selected</div>
+                  <p className="font-mono text-[11px] text-zinc-500">
+                    Click any source pill below an assistant response to expand its full text snippet and YouTube timestamps.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+                    <span>Expanded Chunks ({activeCitations.length})</span>
+                    <span className="text-emerald-400 font-bold">HyDE Grounded</span>
+                  </div>
+
+                  {activeCitations.map((c, idx) => {
+                    const isYT = c.sourceType === 'youtube';
+                    const startTimeFormatted = formatTimestamp(c.startTime);
+                    const endTimeFormatted = formatTimestamp(c.endTime);
+                    const ytLink = isYT ? getYouTubeLink(c.url, c.startTime) : (c.url || '#');
+                    const isHighlighted = activeCitationIndex === idx;
+
+                    return (
+                      <div 
+                        key={idx}
+                        className={`bg-[#0c0c0f] border rounded-2xl p-4 space-y-3 shadow-lg transition-all ${
+                          isHighlighted 
+                            ? 'border-emerald-400/60 bg-emerald-500/[0.03] ring-1 ring-emerald-400/30' 
+                            : 'border-white/15 hover:border-white/30'
+                        }`}
+                      >
+                        {/* Citation Source Header */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <div className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                              {isYT && <Youtube className="w-3.5 h-3.5 text-red-500" />}
+                              {c.sourceType === 'pdf' && <FileText className="w-3.5 h-3.5 text-rose-400" />}
+                              {c.sourceType === 'website' && <Globe className="w-3.5 h-3.5 text-blue-400" />}
+                              {c.sourceType === 'vtt' && <FileText className="w-3.5 h-3.5 text-amber-400" />}
+                            </div>
+                            <span className="font-mono text-xs text-white font-bold truncate">
+                              {c.sourceName || 'Source Chunk'}
+                            </span>
+                          </div>
+
+                          <span className="text-[10px] font-mono uppercase bg-white/10 px-2 py-0.5 rounded text-zinc-300 shrink-0">
+                            {c.sourceType}
+                          </span>
+                        </div>
+
+                        {/* YOUTUBE TIMESTAMPS CLICKABLE LINK */}
+                        {isYT && (c.startTime || c.endTime) && (
+                          <div className="pt-1">
+                            <a
+                              href={ytLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 font-mono text-xs font-bold transition-all cursor-pointer shadow-sm"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Timestamp: [{startTimeFormatted || '00:00'} - {endTimeFormatted || '00:00'}]</span>
+                              <ExternalLink className="w-3 h-3 ml-1" />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Website URL / PDF Page Hint */}
+                        {!isYT && c.url && (
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center space-x-1 text-blue-400 hover:underline font-mono text-[11px] truncate max-w-full"
+                          >
+                            <span>{c.url}</span>
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        )}
+
+                        {!isYT && c.pageHint && (
+                          <div className="text-[11px] font-mono text-zinc-400">
+                            Page Hint: ~Page {c.pageHint}
+                          </div>
+                        )}
+
+                        {/* Snippet text */}
+                        <div className="bg-black/80 rounded-xl p-3 border border-white/10 font-mono text-xs text-zinc-300 leading-relaxed italic border-l-2 border-l-white/30">
+                          "{c.text}"
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+            </div>
+
+            <div className="pt-4 border-t border-white/10 text-[10px] font-mono text-zinc-500 text-center">
+              NotebookLM Citation Inspector
+            </div>
+
+          </aside>
+        )}
 
       </div>
 

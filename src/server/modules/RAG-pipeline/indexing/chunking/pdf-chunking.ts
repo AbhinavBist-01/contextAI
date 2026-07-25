@@ -8,26 +8,28 @@ const OVERLAP_CHARS = 200;    // overlap between consecutive chunks for context 
  * Splits PDF text into overlapping chunks.
  * Strategy:
  *  1. Split by double newlines (paragraph boundaries)
- *  2. If a paragraph exceeds MAX_CHUNK_CHARS, split it further by sentences
- *  3. Accumulate paragraphs into a chunk until MAX_CHUNK_CHARS is reached
- *  4. Add OVERLAP_CHARS of previous chunk at the start of the next (sliding window)
+ *  2. Filter out page marker artifacts like "-- 1 of 12 --"
+ *  3. Accumulate paragraphs into chunks with sliding overlap window
  */
 export function chunkPDF(parsed: ParsedPDF): Chunk[] {
   const { text, fileName } = parsed;
   const chunks: Chunk[] = [];
 
+  // Helper to check if string is purely a page number artifact like "-- 1 of 12 --"
+  const isPageMarker = (str: string) => /^(--\s*\d+\s*of\s*\d+\s*--\s*)+$/gi.test(str.trim());
+
   // Split into paragraphs on double newlines
   const paragraphs = text
     .split(/\n{2,}/)
     .map((p) => p.replace(/\n/g, " ").replace(/\s+/g, " ").trim())
-    .filter((p) => p.length > 0);
+    .filter((p) => p.length > 0 && !isPageMarker(p));
 
   let buffer = "";
   let chunkIndex = 0;
 
   const flushChunk = () => {
     const trimmed = buffer.trim();
-    if (trimmed.length > 0) {
+    if (trimmed.length > 0 && !isPageMarker(trimmed)) {
       chunks.push({
         text: trimmed,
         metadata: {

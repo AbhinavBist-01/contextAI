@@ -56,6 +56,8 @@ sourcesRouter.post(
   checkSourceLimit,
   upload.single("file"),
   async (req: Request, res: Response): Promise<void> => {
+    const filePath = req.file?.path;
+
     try {
       const { userId } = getAuth(req);
 
@@ -67,7 +69,6 @@ sourcesRouter.post(
       const sourceId = randomUUID();
       const fileName = req.file.originalname;
       const ext = path.extname(fileName).toLowerCase();
-      const filePath = req.file.path;
       const sourceType = ext === ".pdf" ? "pdf" : "vtt";
 
       // Insert source row as "indexing"
@@ -94,10 +95,10 @@ sourcesRouter.post(
           let chunks;
 
           if (sourceType === "pdf") {
-            const parsed = await parsePDF(filePath, fileName);
+            const parsed = await parsePDF(filePath!, fileName);
             chunks = chunkPDF(parsed);
           } else {
-            const content = fs.readFileSync(filePath, "utf-8");
+            const content = fs.readFileSync(filePath!, "utf-8");
             const parsed = parseVTT(content, fileName);
             chunks = chunkVTT(parsed);
           }
@@ -115,11 +116,13 @@ sourcesRouter.post(
             .set({ status: "failed" })
             .where(eq(sourceTable.id, sourceId));
         } finally {
-          fs.unlink(filePath, () => {}); // cleanup temp file
+          if (filePath) fs.unlink(filePath, () => {}); // cleanup temp file
         }
       })();
     } catch (err: any) {
       console.error("❌ Error uploading file source:", err);
+      // Clean up temp file if outer handler fails before background task starts
+      if (filePath) fs.unlink(filePath, () => {});
       res.status(500).json({ error: err.message || "Failed to process file upload" });
     }
   },
