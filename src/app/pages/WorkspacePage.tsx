@@ -75,6 +75,16 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   const [notebookTitle, setNotebookTitle] = useState('My AI Knowledge Base');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Helper to build headers with Clerk Bearer token
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    const token = await getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   // Auto scroll chat to bottom
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -87,10 +97,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   // Fetch Sources
   const fetchSources = async () => {
     try {
-      const token = await getToken();
-      const res = await fetch('/api/rag/sources', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/rag/sources', { headers });
       if (res.ok) {
         const data = await res.json();
         setSources(data.sources || []);
@@ -103,10 +111,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   // Fetch History
   const fetchHistory = async () => {
     try {
-      const token = await getToken();
-      const res = await fetch('/api/rag/query/history', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/rag/query/history', { headers });
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
@@ -141,13 +147,12 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
     setIsUploading(true);
 
     try {
-      const token = await getToken();
+      const headers = await getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
       const res = await fetch('/api/rag/sources/url', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           url: urlInput,
           type: urlKind
@@ -177,15 +182,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
     setIsUploading(true);
 
     try {
-      const token = await getToken();
+      const headers = await getAuthHeaders();
       const formData = new FormData();
       formData.append('file', selectedFile);
 
       const res = await fetch('/api/rag/sources/file', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
+        headers,
         body: formData
       });
 
@@ -207,10 +210,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   // Delete Source
   const handleDeleteSource = async (id: string) => {
     try {
-      const token = await getToken();
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/rag/sources/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers
       });
       if (res.ok) {
         setSources(prev => prev.filter(s => s.id !== id));
@@ -240,13 +243,12 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
     setIsLoadingQuery(true);
 
     try {
-      const token = await getToken();
+      const headers = await getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+
       const res = await fetch('/api/rag/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({ message: userMessageText })
       });
 

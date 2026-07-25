@@ -1,6 +1,6 @@
-import React from 'react';
-import { SignIn, SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
-import { Terminal, ArrowLeft, ShieldCheck, Database, Sparkles, CheckCircle2, Lock } from 'lucide-react';
+import React, { useState } from 'react';
+import { SignIn, SignUp, SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import { Terminal, ArrowLeft, ShieldCheck, Database, Sparkles, CheckCircle2, Lock, UserPlus, LogIn } from 'lucide-react';
 
 interface LoginPageProps {
   onBackToHome: () => void;
@@ -8,9 +8,10 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
   const { user } = useUser();
+  const [authTab, setAuthTab] = useState<'signIn' | 'signUp'>('signIn');
 
   return (
-    <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-grid-pattern">
+    <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-grid-pattern selection:bg-white selection:text-black">
       
       {/* Background Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[400px] bg-white/[0.03] rounded-full blur-[150px] pointer-events-none" />
@@ -25,7 +26,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
       </button>
 
       {/* Main Container Card */}
-      <div className="w-full max-w-5xl z-10 bg-[#09090b] rounded-3xl border border-white/20 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+      <div className="w-full max-w-5xl z-10 bg-[#09090b] rounded-3xl border border-white/20 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[660px]">
         
         {/* Left Column: Visual Agentic Showcase */}
         <div className="lg:col-span-5 bg-[#050507] p-8 md:p-10 border-b lg:border-b-0 lg:border-r border-white/15 flex flex-col justify-between space-y-8 relative">
@@ -85,45 +86,94 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
 
         </div>
 
-        {/* Right Column: Custom Dark Clerk Sign In Panel */}
+        {/* Right Column: Custom Dark Clerk Auth Panel */}
         <div className="lg:col-span-7 p-6 md:p-10 flex flex-col justify-center items-center bg-[#09090b] relative">
           
           <div className="w-full max-w-md space-y-5">
             
+            {/* Header */}
             <div className="text-center space-y-1.5">
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white mx-auto mb-2">
                 <Lock className="w-5 h-5" />
               </div>
               <h2 className="text-2xl font-mono font-bold text-white tracking-tight">
-                Developer Authentication
+                {authTab === 'signIn' ? 'Developer Sign In' : 'Create New Account'}
               </h2>
               <p className="text-xs font-mono text-zinc-400">
-                Sign in or register to launch your vector knowledge vault.
+                {authTab === 'signIn' 
+                  ? 'Sign in to access your knowledge base. Don\'t have an account? Switch to Sign Up below.' 
+                  : 'Create a new Clerk developer account to activate your Pinecone vector vault.'}
               </p>
             </div>
 
-            {/* Clerk Component */}
+            {/* Sign In / Sign Up Mode Switcher */}
+            <SignedOut>
+              <div className="flex bg-[#121216] p-1 rounded-xl border border-white/15 font-mono text-xs">
+                <button
+                  onClick={() => setAuthTab('signIn')}
+                  className={`flex-1 py-2 rounded-lg flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                    authTab === 'signIn' ? 'bg-white text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Sign In</span>
+                </button>
+                <button
+                  onClick={() => setAuthTab('signUp')}
+                  className={`flex-1 py-2 rounded-lg flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                    authTab === 'signUp' ? 'bg-white text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Create Account</span>
+                </button>
+              </div>
+            </SignedOut>
+
+            {/* Clerk Components */}
             <div className="w-full flex justify-center py-2">
               <SignedOut>
-                <SignIn 
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
-                      headerTitle: 'text-white font-mono text-lg font-bold',
-                      headerSubtitle: 'text-zinc-400 font-mono text-xs',
-                      socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
-                      socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
-                      dividerLine: 'bg-white/15',
-                      dividerText: 'text-zinc-500 font-mono text-[10px]',
-                      formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
-                      formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
-                      formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
-                      footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
-                      footerActionText: 'text-zinc-400 font-mono text-xs'
-                    }
-                  }}
-                />
+                {authTab === 'signIn' ? (
+                  <SignIn 
+                    appearance={{
+                      elements: {
+                        rootBox: 'w-full',
+                        card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
+                        headerTitle: 'hidden',
+                        headerSubtitle: 'hidden',
+                        socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
+                        socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
+                        dividerLine: 'bg-white/15',
+                        dividerText: 'text-zinc-500 font-mono text-[10px]',
+                        formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
+                        formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
+                        formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
+                        footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
+                        footerActionText: 'text-zinc-400 font-mono text-xs'
+                      }
+                    }}
+                  />
+                ) : (
+                  <SignUp 
+                    appearance={{
+                      elements: {
+                        rootBox: 'w-full',
+                        card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
+                        headerTitle: 'hidden',
+                        headerSubtitle: 'hidden',
+                        socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
+                        socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
+                        dividerLine: 'bg-white/15',
+                        dividerText: 'text-zinc-500 font-mono text-[10px]',
+                        formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
+                        formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
+                        formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
+                        footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
+                        footerActionText: 'text-zinc-400 font-mono text-xs'
+                      }
+                    }}
+                  />
+                )}
               </SignedOut>
 
               <SignedIn>
@@ -139,10 +189,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
                     Vector Partition: pinecone_usr_{user?.id?.slice(-6)} Active
                   </div>
                   <button 
-                    onClick={onBackToHome}
+                    onClick={() => { window.location.hash = '#workspace'; }}
                     className="w-full py-3.5 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
                   >
-                    ENTER DASHBOARD
+                    ENTER WORKSPACE
                   </button>
                 </div>
               </SignedIn>

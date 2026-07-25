@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { clerkMiddleware } from "@clerk/express";
 
@@ -11,19 +11,32 @@ const PORT = process.env.PORT ?? 8000;
 
 // ── Global Middleware ─────────────────────────────────────────────────────────
 
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
-// ── Routes ────────────────────────────────────────────────────────────────────
+// ── Routes (Mounted for both /sources and /api/rag/sources) ──────────────────
 
 app.use("/sources", sourcesRouter);
+app.use("/api/rag/sources", sourcesRouter);
+
 app.use("/query", queryRouter);
+app.use("/api/rag/query", queryRouter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// ── Global Error Handler ──────────────────────────────────────────────────────
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("❌ Unhandled Backend Error:", err);
+  res.status(500).json({
+    error: err.message || "Internal Server Error",
+    details: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

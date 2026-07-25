@@ -122,10 +122,9 @@ export async function deleteSourceVectors(userId: string, sourceId: string): Pro
   const namespacedIndex = index.namespace(userId);
 
   // Fetch vector IDs matching this sourceId using metadata filter
-  // Pinecone delete by metadata filter (requires index to support it)
   await namespacedIndex.deleteMany({
-    sourceId: { $eq: sourceId },
-  } as Parameters<typeof namespacedIndex.deleteMany>[0]);
+    filter: { sourceId: { $eq: sourceId } },
+  });
 
   console.log(`[embed] 🗑 Deleted vectors for source ${sourceId}`);
 }

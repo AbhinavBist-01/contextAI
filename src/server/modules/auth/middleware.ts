@@ -14,30 +14,35 @@ export async function ensureUser(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const { userId } = getAuth(req);
+  try {
+    const { userId } = getAuth(req);
 
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    // Upsert: create user row if first time
+    const existing = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, userId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      await db.insert(userTable).values({
+        id: userId,
+        requestCount: 0,
+        sourceCount: 0,
+        requestResetAt: new Date(),
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("❌ Error in ensureUser middleware:", err);
+    res.status(500).json({ error: "Database error during authentication" });
   }
-
-  // Upsert: create user row if first time
-  const existing = await db
-    .select()
-    .from(userTable)
-    .where(eq(userTable.id, userId))
-    .limit(1);
-
-  if (existing.length === 0) {
-    await db.insert(userTable).values({
-      id: userId,
-      requestCount: 0,
-      sourceCount: 0,
-      requestResetAt: new Date(),
-    });
-  }
-
-  next();
 }
 
 // ── Rate limit: 10 queries/day ────────────────────────────────────────────────
@@ -47,39 +52,44 @@ export async function checkRateLimit(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const [user] = await db
-    .select()
-    .from(userTable)
-    .where(eq(userTable.id, userId))
-    .limit(1);
+    const [user] = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, userId))
+      .limit(1);
 
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  const now = new Date();
-  const resetAt = new Date(user.requestResetAt);
-  const hoursSinceReset = (now.getTime() - resetAt.getTime()) / (1000 * 60 * 60);
+    const now = new Date();
+    const resetAt = new Date(user.requestResetAt);
+    const hoursSinceReset = (now.getTime() - resetAt.getTime()) / (1000 * 60 * 60);
 
-  // Reset count if 24h have passed
-  if (hoursSinceReset >= 24) {
-    await db
-      .update(userTable)
-      .set({ requestCount: 0, requestResetAt: now })
-      .where(eq(userTable.id, userId));
+    // Reset count if 24h have passed
+    if (hoursSinceReset >= 24) {
+      await db
+        .update(userTable)
+        .set({ requestCount: 0, requestResetAt: now })
+        .where(eq(userTable.id, userId));
+      next();
+      return;
+    }
+
+    if (user.requestCount >= MAX_REQUESTS_PER_DAY) {
+      res.status(429).json({
+        error: "Daily limit reached. You can send 10 queries per day.",
+      });
+      return;
+    }
+
     next();
-    return;
+  } catch (err) {
+    console.error("❌ Error in checkRateLimit middleware:", err);
+    res.status(500).json({ error: "Error checking query rate limit" });
   }
-
-  if (user.requestCount >= MAX_REQUESTS_PER_DAY) {
-    res.status(429).json({
-      error: "Daily limit reached. You can send 10 queries per day.",
-    });
-    return;
-  }
-
-  next();
 }
 
 // ── Source limit: max 5 sources ───────────────────────────────────────────────
@@ -89,23 +99,28 @@ export async function checkSourceLimit(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const [user] = await db
-    .select()
-    .from(userTable)
-    .where(eq(userTable.id, userId))
-    .limit(1);
+    const [user] = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, userId))
+      .limit(1);
 
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  if (user.sourceCount >= MAX_SOURCES) {
-    res.status(403).json({
-      error: "Source limit reached. You can add up to 5 sources.",
-    });
-    return;
+    if (user.sourceCount >= MAX_SOURCES) {
+      res.status(403).json({
+        error: "Source limit reached. You can add up to 5 sources.",
+      });
+      return;
+    }
+
+    next();
+  } catch (err) {
+    console.error("❌ Error in checkSourceLimit middleware:", err);
+    res.status(500).json({ error: "Error checking source limit" });
   }
-
-  next();
 }

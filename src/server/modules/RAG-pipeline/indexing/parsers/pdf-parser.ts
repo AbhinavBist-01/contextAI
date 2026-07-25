@@ -1,7 +1,5 @@
 import fs from "fs";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string; numpages: number }>;
+import { PDFParse } from "pdf-parse";
 
 export interface ParsedPDF {
   text: string;
@@ -19,11 +17,13 @@ export async function parsePDF(
   fileName: string
 ): Promise<ParsedPDF> {
   const buffer = fs.readFileSync(filePath);
-  const data = await pdfParse(buffer);
+  const parser = new PDFParse({ data: buffer });
+  const data = await parser.getText();
+  await parser.destroy();
 
   return {
     text: data.text,
-    totalPages: data.numpages,
+    totalPages: data.total,
     fileName,
   };
 }
