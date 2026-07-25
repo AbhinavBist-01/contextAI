@@ -1,8 +1,14 @@
-import { pgTable, serial, numeric, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  numeric,
+  timestamp,
+  text,
+  integer,
+} from "drizzle-orm/pg-core";
 
 export const userTable = pgTable("users", {
-  id: serial("id").primaryKey(),
-  requestCount: numeric("request_count", { precision: 10, scale: 0 }).notNull(),
+  id: text("id").primaryKey(),
   requestResetAt: timestamp("request_reset_at").notNull().defaultNow(),
-  sourceCount: numeric("source_count", { precision: 10, scale: 0 }).notNull(),
+  requestCount: integer("request_count").notNull().default(0),
+  sourceCount: integer("source_count").notNull().default(0),
 });
