@@ -40,7 +40,7 @@ app.get("/health", (_req, res) => {
 const distPath = path.resolve(__dirname, "../../../dist");
 app.use(express.static(distPath));
 
-app.get("*", (req, res, next) => {
+app.get("(.*)", (req, res, next) => {
   if (req.path.startsWith("/api") || req.path.startsWith("/sources") || req.path.startsWith("/query")) {
     return next();
   }
