@@ -78,56 +78,78 @@ async function generateHyDE(userQuery: string): Promise<string> {
 // ── Step 2: Embed query + HyDE answer ────────────────────────────────────────
 
 /**
- * Embeds both the original user query and the HyDE answer,
- * then averages them to get a single combined query vector.
- * This gives the best of both — specificity of the query + richness of HyDE.
+ * Embeds both the user query and HyDE answer into separate 1024-dim vectors.
  */
-async function buildQueryVector(
+async function buildQueryVectors(
   userQuery: string,
   hydeAnswer: string,
-): Promise<number[]> {
+): Promise<{ queryVector: number[]; hydeVector: number[] }> {
   const response = await openai.embeddings.create({
     model: EMBEDDING_MODEL,
     dimensions: VECTOR_DIMENSION,
     input: [userQuery, hydeAnswer],
   });
 
-  const queryVec = response.data[0]!.embedding;
-  const hydeVec = response.data[1]!.embedding;
-
-  // Average the two vectors element-wise
-  return queryVec.map((val, i) => (val + hydeVec[i]!) / 2);
+  return {
+    queryVector: response.data[0]!.embedding,
+    hydeVector: response.data[1]!.embedding,
+  };
 }
 
-// ── Step 3: Semantic Search in Pinecone ──────────────────────────────────────
+// ── Step 3: Dual Semantic Search in Pinecone ─────────────────────────────────
 
 async function semanticSearch(
   queryVector: number[],
+  hydeVector: number[],
   userId: string,
 ): Promise<SourceCitation[]> {
   const namespacedIndex = index.namespace(userId);
 
-  const results = await namespacedIndex.query({
-    vector: queryVector,
-    topK: TOP_K,
-    includeMetadata: true,
-  });
+  // Run searches in parallel: one for direct query, one for HyDE
+  const [directResults, hydeResults] = await Promise.all([
+    namespacedIndex.query({
+      vector: queryVector,
+      topK: 6,
+      includeMetadata: true,
+    }),
+    namespacedIndex.query({
+      vector: hydeVector,
+      topK: 6,
+      includeMetadata: true,
+    }),
+  ]);
 
-  return (results.matches ?? [])
-    .filter((match) => match.metadata)
-    .map((match) => {
-      const m = match.metadata as Record<string, string | number>;
-      return {
-        sourceName: String(m.sourceName ?? ""),
-        sourceType: String(m.sourceType ?? ""),
-        ...(m.url ? { url: String(m.url) } : {}),
-        ...(m.heading ? { heading: String(m.heading) } : {}),
-        ...(m.startTime ? { startTime: String(m.startTime) } : {}),
-        ...(m.endTime ? { endTime: String(m.endTime) } : {}),
-        ...(m.pageHint ? { pageHint: Number(m.pageHint) } : {}),
-        text: String(m.text ?? ""),
-      };
+  const combinedMatches = [
+    ...(directResults.matches ?? []),
+    ...(hydeResults.matches ?? []),
+  ];
+
+  // Deduplicate matches based on metadata text / id
+  const seenTexts = new Set<string>();
+  const citations: SourceCitation[] = [];
+
+  for (const match of combinedMatches) {
+    if (!match.metadata) continue;
+    const m = match.metadata as Record<string, string | number>;
+    const text = String(m.text ?? "").trim();
+    if (!text || seenTexts.has(text)) continue;
+
+    seenTexts.add(text);
+    citations.push({
+      sourceName: String(m.sourceName ?? ""),
+      sourceType: String(m.sourceType ?? ""),
+      ...(m.url ? { url: String(m.url) } : {}),
+      ...(m.heading ? { heading: String(m.heading) } : {}),
+      ...(m.startTime ? { startTime: String(m.startTime) } : {}),
+      ...(m.endTime ? { endTime: String(m.endTime) } : {}),
+      ...(m.pageHint ? { pageHint: Number(m.pageHint) } : {}),
+      text,
     });
+
+    if (citations.length >= 8) break; // Limit to top 8 distinct chunks
+  }
+
+  return citations;
 }
 
 // ── Step 4: Generate Final Grounded Answer ───────────────────────────────────
@@ -145,15 +167,14 @@ async function generateAnswer(
     messages: [
       {
         role: "system",
-        content: `You are ContextAI, a helpful assistant that answers questions strictly based on the provided source chunks.
+        content: `You are ContextAI, an expert AI research assistant that synthesizes answers strictly based on the user's uploaded sources.
 
-Rules:
-- Answer only from the context provided below.
-- If the context does not contain enough information to answer the question, say: "I couldn't find relevant information in your sources."
-- Be concise and specific.
-- Reference the source name when citing information (e.g. "According to [source name]...").
-- Do NOT make up information outside the provided context.
-- Do not include any hate speech, offensive content, or personal opinions.
+Guidelines:
+- Provide a clear, accurate, and comprehensive answer using the context provided below.
+- If the user asks for a summary, overview, key concepts, or general explanation, synthesize the main topics from the provided context chunks.
+- Always cite the source name when introducing information (e.g., "According to [source name]...").
+- Do NOT invent facts or include information that is unsupported by the context chunks.
+- If the context chunks contain NO information related to the question whatsoever, state: "I couldn't find relevant information in your sources."
 
 Context:
 ${context}`,
@@ -163,7 +184,7 @@ ${context}`,
         content: userQuery,
       },
     ],
-    temperature: 0.2,
+    temperature: 0.3,
     max_tokens: 800,
   });
 
@@ -205,9 +226,9 @@ async function generateDirectAnswer(userQuery: string): Promise<string> {
  * Full query pipeline:
  *
  * IF user has sources:
- *   userQuery → HyDE answer → embed both → average vector
- *   → Pinecone semantic search (namespaced by userId)
- *   → grounded GPT answer with citations
+ *   userQuery → HyDE answer → embed both
+ *   → Dual Pinecone semantic search (direct query + HyDE vector)
+ *   → Deduplicate top 8 chunks → grounded GPT answer with citations
  *
  * IF no sources:
  *   userQuery → direct GPT answer (no RAG)
@@ -227,12 +248,12 @@ export async function runQuery(options: QueryOptions): Promise<QueryResult> {
   const hydeAnswer = await generateHyDE(userQuery);
   console.log(`[query] HyDE answer generated`);
 
-  // 2. Embed both query + HyDE and average
-  const queryVector = await buildQueryVector(userQuery, hydeAnswer);
-  console.log(`[query] Query vector built`);
+  // 2. Embed both query + HyDE
+  const { queryVector, hydeVector } = await buildQueryVectors(userQuery, hydeAnswer);
+  console.log(`[query] Query vectors built`);
 
-  // 3. Semantic search in user's Pinecone namespace
-  const citations = await semanticSearch(queryVector, userId);
+  // 3. Dual semantic search in user's Pinecone namespace
+  const citations = await semanticSearch(queryVector, hydeVector, userId);
   console.log(`[query] Retrieved ${citations.length} relevant chunks`);
 
   // 4. If no relevant chunks found, fall back to direct answer

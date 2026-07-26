@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "server": "tsx watch src/server/index.ts",
+    "start": "tsx src/server/index.ts",
     "dev": "vite",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",

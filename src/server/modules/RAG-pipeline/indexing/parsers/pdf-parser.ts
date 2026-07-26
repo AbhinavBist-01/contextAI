@@ -21,7 +21,7 @@ export async function parsePDF(
   const parser = new PDFParse({ data: buffer });
   
   // Load PDF structure into memory
-  await parser.load();
+  await (parser as any).load();
 
   const info = await parser.getText();
   const totalPages = info.total || 1;
@@ -31,7 +31,7 @@ export async function parsePDF(
   // Iterate over each page to extract actual textual content
   for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
     try {
-      const pageResult = await parser.getPageText(pageNum);
+      const pageResult = await (parser as any).getPageText(pageNum);
       const rawText = pageResult?.text?.trim() ?? "";
       // Strip out empty page headers like "-- 1 of 12 --" if no real text
       const cleanText = rawText.replace(/^--\s*\d+\s*of\s*\d+\s*--$/gi, "").trim();

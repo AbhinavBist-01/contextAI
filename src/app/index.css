@@ -61,10 +61,35 @@
   transform: translateY(-1px);
 }
 
-/* Explicit Clerk Dark Theme & Placeholder CSS Overrides */
-.cl-card, .cl-main, .cl-rootBox {
+/* Explicit Clerk Dark Theme & Developer Mode CSS Overrides */
+.cl-card, 
+.cl-main, 
+.cl-rootBox, 
+.cl-page, 
+.cl-signIn-start, 
+.cl-signUp-start, 
+.cl-developerMode, 
+.cl-devModeNotice, 
+.cl-footer, 
+.cl-footerPages, 
+.cl-navbar,
+.cl-navbarButtons,
+[class*="cl-internal"],
+[class*="cl-card"],
+[class*="cl-footer"] {
   background-color: #09090b !important;
   color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.cl-developerMode, 
+.cl-devModeNotice, 
+.cl-badge,
+[class*="cl-badge"] {
+  background-color: #121216 !important;
+  color: #a1a1aa !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
 }
 
 .cl-headerTitle {
@@ -153,13 +178,9 @@
   font-weight: 600 !important;
 }
 
-.cl-footerActionText {
+.cl-footerActionText, .cl-footerPagesLink {
   color: #a1a1aa !important;
   font-family: 'JetBrains Mono', monospace !important;
-}
-
-.cl-internal-ph57gq, .cl-internal-b3fm6y, .cl-footer {
-  background-color: transparent !important;
 }
 
 /* Custom Scrollbar */

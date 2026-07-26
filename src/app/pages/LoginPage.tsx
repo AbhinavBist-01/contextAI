@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { SignIn, SignUp, SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
-import { Terminal, ArrowLeft, ShieldCheck, Database, Sparkles, CheckCircle2, Lock, UserPlus, LogIn } from 'lucide-react';
+import React from 'react';
+import { SignIn, SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
+import { Terminal, ArrowLeft, ShieldCheck, Database, CheckCircle2, Lock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { LampContainer } from '../components/ui/lamp';
 
 interface LoginPageProps {
   onBackToHome: () => void;
@@ -8,7 +10,6 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
   const { user } = useUser();
-  const [authTab, setAuthTab] = useState<'signIn' | 'signUp'>('signIn');
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-grid-pattern selection:bg-white selection:text-black">
@@ -26,10 +27,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
       </button>
 
       {/* Main Container Card */}
-      <div className="w-full max-w-5xl z-10 bg-[#09090b] rounded-3xl border border-white/20 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[660px]">
+      <div className="w-full max-w-5xl z-10 bg-[#09090b] rounded-3xl border border-white/20 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[680px]">
         
-        {/* Left Column: Visual Agentic Showcase */}
-        <div className="lg:col-span-5 bg-[#050507] p-8 md:p-10 border-b lg:border-b-0 lg:border-r border-white/15 flex flex-col justify-between space-y-8 relative">
+        {/* Left Column: Aceternity Lamp & Visual Agentic Showcase */}
+        <div className="lg:col-span-5 bg-[#050507] p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-white/15 flex flex-col justify-between space-y-6 relative overflow-hidden">
           
           <div className="space-y-4 z-10">
             <div className="flex items-center space-x-3">
@@ -41,14 +42,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
                 <span className="ml-2 text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-zinc-300 border border-white/15">v1.0</span>
               </div>
             </div>
-            <p className="text-xs font-mono text-zinc-400 leading-relaxed">
-              [ Isolated Vector Vault & HyDE RAG Engine ]
-            </p>
+          </div>
+
+          {/* Aceternity Lamp Effect Component */}
+          <div className="my-auto z-10">
+            <LampContainer className="min-h-[220px] py-4 bg-transparent">
+              <motion.h1
+                initial={{ opacity: 0.5, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{
+                  delay: 0.2,
+                  duration: 0.7,
+                  ease: "easeInOut",
+                }}
+                className="bg-gradient-to-br from-white via-zinc-200 to-zinc-500 py-2 bg-clip-text text-center text-2xl font-bold font-mono tracking-tight text-transparent md:text-3xl"
+              >
+                Secure AI Vault <br />
+                <span className="text-xs text-emerald-400 font-normal tracking-wider uppercase">[ HyDE RAG Engine ]</span>
+              </motion.h1>
+            </LampContainer>
           </div>
 
           {/* System Metrics Cards */}
           <div className="space-y-3 z-10 font-mono text-xs">
-            <div className="bg-[#0b0b0e] rounded-2xl p-4 border border-white/15 space-y-2">
+            <div className="bg-[#0b0b0e] rounded-2xl p-3.5 border border-white/15 space-y-1.5">
               <div className="flex items-center justify-between text-zinc-300">
                 <span className="flex items-center text-white font-bold">
                   <Database className="w-3.5 h-3.5 mr-2 text-emerald-400" />
@@ -56,27 +73,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
                 </span>
                 <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">ISOLATED</span>
               </div>
-              <div className="text-[11px] text-zinc-400">
+              <div className="text-[10px] text-zinc-400 leading-relaxed">
                 Per-user vector namespace isolation mapped to Clerk auth ID.
-              </div>
-            </div>
-
-            <div className="bg-[#0b0b0e] rounded-2xl p-4 border border-white/15 space-y-2">
-              <div className="flex items-center justify-between text-zinc-300">
-                <span className="flex items-center text-white font-bold">
-                  <Sparkles className="w-3.5 h-3.5 mr-2 text-white" />
-                  <span>HyDE Expansion</span>
-                </span>
-                <span className="text-[10px] text-white font-bold bg-white/10 px-2 py-0.5 rounded border border-white/20">98% RECALL</span>
-              </div>
-              <div className="text-[11px] text-zinc-400">
-                Hypothetical embedding generation hits vector space with accuracy.
               </div>
             </div>
           </div>
 
           {/* Footer Security Note */}
-          <div className="pt-4 border-t border-white/15 flex items-center justify-between text-[11px] font-mono text-zinc-400 z-10">
+          <div className="pt-3 border-t border-white/15 flex items-center justify-between text-[10px] font-mono text-zinc-400 z-10">
             <span className="flex items-center">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 mr-1.5" />
               <span>Clerk Auth Session</span>
@@ -93,87 +97,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
             
             {/* Header */}
             <div className="text-center space-y-1.5">
-              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white mx-auto mb-2">
-                <Lock className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white mx-auto mb-2 shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                <Lock className="w-5 h-5 text-emerald-400" />
               </div>
               <h2 className="text-2xl font-mono font-bold text-white tracking-tight">
-                {authTab === 'signIn' ? 'Developer Sign In' : 'Create New Account'}
+                Authentication Vault
               </h2>
-              <p className="text-xs font-mono text-zinc-400">
-                {authTab === 'signIn' 
-                  ? 'Sign in to access your knowledge base. Don\'t have an account? Switch to Sign Up below.' 
-                  : 'Create a new Clerk developer account to activate your Pinecone vector vault.'}
+              <p className="text-xs font-mono text-zinc-400 max-w-sm mx-auto">
+                Sign in or create your ContextAI account to access your isolated vector knowledge base.
               </p>
             </div>
 
-            {/* Sign In / Sign Up Mode Switcher */}
-            <SignedOut>
-              <div className="flex bg-[#121216] p-1 rounded-xl border border-white/15 font-mono text-xs">
-                <button
-                  onClick={() => setAuthTab('signIn')}
-                  className={`flex-1 py-2 rounded-lg flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                    authTab === 'signIn' ? 'bg-white text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>Sign In</span>
-                </button>
-                <button
-                  onClick={() => setAuthTab('signUp')}
-                  className={`flex-1 py-2 rounded-lg flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                    authTab === 'signUp' ? 'bg-white text-black font-bold shadow-md' : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Create Account</span>
-                </button>
-              </div>
-            </SignedOut>
-
-            {/* Clerk Components */}
+            {/* Clerk Components (Explicit Dark Styling) */}
             <div className="w-full flex justify-center py-2">
               <SignedOut>
-                {authTab === 'signIn' ? (
-                  <SignIn 
-                    appearance={{
-                      elements: {
-                        rootBox: 'w-full',
-                        card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
-                        headerTitle: 'hidden',
-                        headerSubtitle: 'hidden',
-                        socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
-                        socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
-                        dividerLine: 'bg-white/15',
-                        dividerText: 'text-zinc-500 font-mono text-[10px]',
-                        formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
-                        formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
-                        formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
-                        footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
-                        footerActionText: 'text-zinc-400 font-mono text-xs'
-                      }
-                    }}
-                  />
-                ) : (
-                  <SignUp 
-                    appearance={{
-                      elements: {
-                        rootBox: 'w-full',
-                        card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
-                        headerTitle: 'hidden',
-                        headerSubtitle: 'hidden',
-                        socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
-                        socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
-                        dividerLine: 'bg-white/15',
-                        dividerText: 'text-zinc-500 font-mono text-[10px]',
-                        formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
-                        formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
-                        formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
-                        footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
-                        footerActionText: 'text-zinc-400 font-mono text-xs'
-                      }
-                    }}
-                  />
-                )}
+                <SignIn 
+                  appearance={{
+                    elements: {
+                      rootBox: 'w-full',
+                      card: 'bg-[#09090b] border-0 shadow-none p-0 w-full text-white',
+                      headerTitle: 'hidden',
+                      headerSubtitle: 'hidden',
+                      socialButtonsBlockButton: 'bg-[#121216] border border-white/20 text-white hover:bg-[#1a1a22] font-mono text-xs rounded-xl py-2.5',
+                      socialButtonsBlockButtonText: 'font-mono text-xs text-white font-medium',
+                      dividerLine: 'bg-white/15',
+                      dividerText: 'text-zinc-500 font-mono text-[10px]',
+                      formButtonPrimary: 'bg-white text-black font-mono text-xs font-bold hover:bg-zinc-200 rounded-xl py-3 shadow-[0_0_20px_rgba(255,255,255,0.2)]',
+                      formFieldLabel: 'text-zinc-200 font-mono text-xs font-medium',
+                      formFieldInput: 'bg-[#121216] border border-white/25 text-white placeholder-zinc-400 font-mono text-xs rounded-xl py-2.5 px-3 focus:border-white focus:ring-1 focus:ring-white',
+                      footerActionLink: 'text-white hover:underline font-mono text-xs font-bold',
+                      footerActionText: 'text-zinc-400 font-mono text-xs',
+                      footer: 'bg-[#09090b] text-zinc-400',
+                      developerModeNotice: 'bg-[#121216] text-zinc-400 border border-white/15 rounded-xl text-xs'
+                    }
+                  }}
+                />
               </SignedOut>
 
               <SignedIn>

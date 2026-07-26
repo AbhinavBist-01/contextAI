@@ -71,7 +71,7 @@ queryRouter.post(
           .select()
           .from(sourceTable)
           .where(eq(sourceTable.userId, userId));
-        hasSources = userSources.some((s) => s.status === "indexed");
+        hasSources = userSources.some((s: any) => s.status === "indexed");
       } catch (dbErr) {
         console.warn("[query] Error fetching user sources from DB:", dbErr);
       }
@@ -153,7 +153,7 @@ queryRouter.get(
         .orderBy(chatMessageTable.createdAt);
 
       res.json({
-        messages: messages.map((m) => ({
+        messages: messages.map((m: any) => ({
           ...m,
           citations: JSON.parse(m.citations ?? "[]") as unknown[],
         })),
@@ -164,3 +164,29 @@ queryRouter.get(
     }
   },
 );
+
+// ── DELETE /query/history — Clear chat history ───────────────────────────────
+
+queryRouter.delete(
+  "/history",
+  ensureUser,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { userId } = getAuth(req);
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
+      await db
+        .delete(chatMessageTable)
+        .where(eq(chatMessageTable.userId, userId));
+
+      res.json({ success: true, message: "Chat history cleared" });
+    } catch (err: any) {
+      console.error("❌ Error clearing chat history:", err);
+      res.status(500).json({ error: err.message || "Failed to clear chat history" });
+    }
+  },
+);
+
