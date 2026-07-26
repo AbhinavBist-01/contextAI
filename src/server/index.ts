@@ -37,16 +37,22 @@ app.get("/health", (_req, res) => {
 
 // ── Serve Static Assets in Production ─────────────────────────────────────────
 
-const distPath = path.resolve(__dirname, "../../../dist");
+const distPath = path.resolve(process.cwd(), "dist");
 app.use(express.static(distPath));
 
-app.get("/*splat", (req, res, next) => {
-  if (req.path.startsWith("/api") || req.path.startsWith("/sources") || req.path.startsWith("/query")) {
-    return next();
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (
+    req.method === "GET" &&
+    !req.path.startsWith("/api") &&
+    !req.path.startsWith("/sources") &&
+    !req.path.startsWith("/query") &&
+    !req.path.startsWith("/health")
+  ) {
+    return res.sendFile(path.join(distPath, "index.html"), (err) => {
+      if (err) next();
+    });
   }
-  res.sendFile(path.join(distPath, "index.html"), (err) => {
-    if (err) next();
-  });
+  next();
 });
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
