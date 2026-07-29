@@ -5,6 +5,7 @@ import { clerkMiddleware } from "@clerk/express";
 
 import { sourcesRouter } from "./modules/RAG-pipeline/sources.router.js";
 import { queryRouter } from "./modules/RAG-pipeline/query.router.js";
+import { notebooksRouter } from "./modules/notebooks/notebooks.router.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 8000;
@@ -15,7 +16,10 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
-// ── Routes (Mounted for both /sources and /api/rag/sources) ──────────────────
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+app.use("/notebooks", notebooksRouter);
+app.use("/api/notebooks", notebooksRouter);
 
 app.use("/sources", sourcesRouter);
 app.use("/api/rag/sources", sourcesRouter);
@@ -44,6 +48,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (
     req.method === "GET" &&
     !req.path.startsWith("/api") &&
+    !req.path.startsWith("/notebooks") &&
     !req.path.startsWith("/sources") &&
     !req.path.startsWith("/query") &&
     !req.path.startsWith("/health")

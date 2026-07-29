@@ -31,6 +31,20 @@ export const userTable = pgTable("users", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ── Notebooks ─────────────────────────────────────────────────────────────────
+
+export const notebookTable = pgTable("notebooks", {
+  id: text("id").primaryKey(),           // uuid
+  userId: text("user_id")
+    .notNull()
+    .references(() => userTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),          // title of the notebook
+  description: text("description").default(""),
+  coverImage: text("cover_image").default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // ── Sources ───────────────────────────────────────────────────────────────────
 
 export const sourceTable = pgTable("sources", {
@@ -38,6 +52,8 @@ export const sourceTable = pgTable("sources", {
   userId: text("user_id")
     .notNull()
     .references(() => userTable.id, { onDelete: "cascade" }),
+  notebookId: text("notebook_id")
+    .references(() => notebookTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),          // file name or URL
   type: sourceTypeEnum("type").notNull(),
   status: sourceStatusEnum("status").notNull().default("indexing"),
@@ -51,6 +67,8 @@ export const chatMessageTable = pgTable("chat_messages", {
   userId: text("user_id")
     .notNull()
     .references(() => userTable.id, { onDelete: "cascade" }),
+  notebookId: text("notebook_id")
+    .references(() => notebookTable.id, { onDelete: "cascade" }),
   role: text("role", { enum: ["user", "assistant"] }).notNull(),
   content: text("content").notNull(),
   citations: text("citations").default("[]"), // JSON stringified SourceCitation[]

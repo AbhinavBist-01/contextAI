@@ -28,6 +28,7 @@ import { embedAndStore, deleteSourceVectors } from "./indexing/embed.js";
 const urlSourceSchema = z.object({
   url: z.string().url("Must be a valid URL"),
   type: z.enum(["youtube", "website"]),
+  notebookId: z.string().optional(),
 });
 
 // ── Multer ────────────────────────────────────────────────────────────────────
@@ -70,11 +71,13 @@ sourcesRouter.post(
       const fileName = req.file.originalname;
       const ext = path.extname(fileName).toLowerCase();
       const sourceType = ext === ".pdf" ? "pdf" : "vtt";
+      const notebookId = (req.body.notebookId || req.query.notebookId) as string | undefined;
 
       // Insert source row as "indexing"
       await db.insert(sourceTable).values({
         id: sourceId,
         userId,
+        notebookId: notebookId || null,
         name: fileName,
         type: sourceType,
         status: "indexing",
@@ -148,12 +151,13 @@ sourcesRouter.post(
         return;
       }
 
-      const { url, type } = parsed.data;
+      const { url, type, notebookId } = parsed.data;
       const sourceId = randomUUID();
 
       await db.insert(sourceTable).values({
         id: sourceId,
         userId,
+        notebookId: notebookId || null,
         name: url,
         type,
         status: "indexing",
@@ -200,7 +204,7 @@ sourcesRouter.post(
   },
 );
 
-// ── GET /sources — List user's sources ───────────────────────────────────────
+// ── GET /sources — List user's sources (optionally scoped to notebook) ───────
 
 sourcesRouter.get(
   "/",
@@ -213,11 +217,19 @@ sourcesRouter.get(
         return;
       }
 
-      const sources = await db
-        .select()
-        .from(sourceTable)
-        .where(eq(sourceTable.userId, userId))
-        .orderBy(sourceTable.createdAt);
+      const notebookId = req.query.notebookId as string | undefined;
+
+      const sources = notebookId
+        ? await db
+            .select()
+            .from(sourceTable)
+            .where(sql`${sourceTable.userId} = ${userId} AND ${sourceTable.notebookId} = ${notebookId}`)
+            .orderBy(sourceTable.createdAt)
+        : await db
+            .select()
+            .from(sourceTable)
+            .where(eq(sourceTable.userId, userId))
+            .orderBy(sourceTable.createdAt);
 
       res.json({ sources });
     } catch (err: any) {
