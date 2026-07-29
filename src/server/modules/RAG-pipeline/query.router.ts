@@ -20,6 +20,7 @@ const queryInputSchema = z.object({
     .string()
     .min(1, "Message cannot be empty")
     .max(2000, "Message too long"),
+  notebookId: z.string().optional(),
 });
 
 const citationSchema = z.object({
@@ -62,15 +63,20 @@ queryRouter.post(
         return;
       }
 
-      const { message } = inputParsed.data;
+      const { message, notebookId } = inputParsed.data;
 
-      // Check if user has any indexed sources
+      // Check if user has any indexed sources (scoped to notebook if provided)
       let hasSources = false;
       try {
-        const userSources = await db
-          .select()
-          .from(sourceTable)
-          .where(eq(sourceTable.userId, userId));
+        const userSources = notebookId
+          ? await db
+              .select()
+              .from(sourceTable)
+              .where(sql`${sourceTable.userId} = ${userId} AND ${sourceTable.notebookId} = ${notebookId}`)
+          : await db
+              .select()
+              .from(sourceTable)
+              .where(eq(sourceTable.userId, userId));
         hasSources = userSources.some((s: any) => s.status === "indexed");
       } catch (dbErr) {
         console.warn("[query] Error fetching user sources from DB:", dbErr);
@@ -81,6 +87,7 @@ queryRouter.post(
         await db.insert(chatMessageTable).values({
           id: randomUUID(),
           userId,
+          notebookId: notebookId || null,
           role: "user",
           content: message,
           citations: "[]",
@@ -108,6 +115,7 @@ queryRouter.post(
         await db.insert(chatMessageTable).values({
           id: randomUUID(),
           userId,
+          notebookId: notebookId || null,
           role: "assistant",
           content: result.answer,
           citations: JSON.stringify(result.citations),
@@ -133,7 +141,7 @@ queryRouter.post(
   },
 );
 
-// ── GET /query/history — Chat history ────────────────────────────────────────
+// ── GET /query/history — Chat history (optionally filtered by notebookId) ────
 
 queryRouter.get(
   "/history",
@@ -146,11 +154,19 @@ queryRouter.get(
         return;
       }
 
-      const messages = await db
-        .select()
-        .from(chatMessageTable)
-        .where(eq(chatMessageTable.userId, userId))
-        .orderBy(chatMessageTable.createdAt);
+      const notebookId = req.query.notebookId as string | undefined;
+
+      const messages = notebookId
+        ? await db
+            .select()
+            .from(chatMessageTable)
+            .where(sql`${chatMessageTable.userId} = ${userId} AND ${chatMessageTable.notebookId} = ${notebookId}`)
+            .orderBy(chatMessageTable.createdAt)
+        : await db
+            .select()
+            .from(chatMessageTable)
+            .where(eq(chatMessageTable.userId, userId))
+            .orderBy(chatMessageTable.createdAt);
 
       res.json({
         messages: messages.map((m: any) => ({
@@ -178,9 +194,17 @@ queryRouter.delete(
         return;
       }
 
-      await db
-        .delete(chatMessageTable)
-        .where(eq(chatMessageTable.userId, userId));
+      const notebookId = req.query.notebookId as string | undefined;
+
+      if (notebookId) {
+        await db
+          .delete(chatMessageTable)
+          .where(sql`${chatMessageTable.userId} = ${userId} AND ${chatMessageTable.notebookId} = ${notebookId}`);
+      } else {
+        await db
+          .delete(chatMessageTable)
+          .where(eq(chatMessageTable.userId, userId));
+      }
 
       res.json({ success: true, message: "Chat history cleared" });
     } catch (err: any) {

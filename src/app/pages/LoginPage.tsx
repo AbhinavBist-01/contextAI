@@ -147,10 +147,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToHome }) => {
                     Vector Partition: pinecone_usr_{user?.id?.slice(-6)} Active
                   </div>
                   <button 
-                    onClick={() => { window.location.hash = '#workspace'; }}
+                    onClick={() => { window.location.hash = '#notebooks'; }}
                     className="w-full py-3.5 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] cursor-pointer"
                   >
-                    ENTER WORKSPACE
+                    ENTER NOTEBOOKS VAULT
                   </button>
                 </div>
               </SignedIn>

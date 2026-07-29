@@ -64,6 +64,9 @@ interface ChatMessage {
 
 interface WorkspacePageProps {
   onBackToHome: () => void;
+  onBackToDashboard?: () => void;
+  notebookId?: string;
+  notebookTitle?: string;
 }
 
 // Format seconds into MM:SS timestamp e.g. 75.4 -> 01:15
@@ -86,7 +89,12 @@ function getYouTubeLink(url?: string, startTime?: string): string {
   return `${url}?t=${startSec}s`;
 }
 
-export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) => {
+export const WorkspacePage: React.FC<WorkspacePageProps> = ({
+  onBackToHome,
+  onBackToDashboard,
+  notebookId,
+  notebookTitle: propNotebookTitle,
+}) => {
   const { getToken } = useAuth();
   const { user } = useUser();
 
@@ -103,8 +111,14 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState<number>(0);
-  const [notebookTitle, setNotebookTitle] = useState('My AI Knowledge Base');
+  const [notebookTitle, setNotebookTitle] = useState(propNotebookTitle || 'My AI Knowledge Base');
   
+  useEffect(() => {
+    if (propNotebookTitle) {
+      setNotebookTitle(propNotebookTitle);
+    }
+  }, [propNotebookTitle]);
+
   // Right sidebar citation state
   const [activeCitations, setActiveCitations] = useState<Citation[]>([]);
   const [activeCitationIndex, setActiveCitationIndex] = useState<number | null>(null);
@@ -120,10 +134,13 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
 
   // Clear Chat History
   const handleClearHistory = async () => {
-    if (!window.confirm("Are you sure you want to clear chat history?")) return;
+    if (!window.confirm("Are you sure you want to clear chat history for this notebook?")) return;
     try {
       const headers = await getAuthHeaders();
-      await fetch('/api/rag/query/history', { method: 'DELETE', headers });
+      const endpoint = notebookId
+        ? `/api/rag/query/history?notebookId=${notebookId}`
+        : '/api/rag/query/history';
+      await fetch(endpoint, { method: 'DELETE', headers });
       setMessages([]);
       setActiveCitations([]);
       setActiveCitationIndex(null);
@@ -136,7 +153,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   // Export Chat as Markdown
   const handleExportChat = () => {
     if (messages.length === 0) return;
-    const lines = [`# ContextAI Notebook Transcript\nDate: ${new Date().toLocaleString()}\n\n---\n`];
+    const lines = [`# ${notebookTitle} Transcript\nDate: ${new Date().toLocaleString()}\n\n---\n`];
     messages.forEach(m => {
       const role = m.role === 'user' ? '👤 User' : '🤖 ContextAI';
       lines.push(`### ${role}\n${m.content}\n`);
@@ -153,7 +170,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ContextAI-Notebook-${Date.now()}.md`;
+    a.download = `${notebookTitle.replace(/\s+/g, '-')}-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -183,7 +200,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   const fetchSources = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch('/api/rag/sources', { headers });
+      const endpoint = notebookId
+        ? `/api/rag/sources?notebookId=${notebookId}`
+        : '/api/rag/sources';
+      const res = await fetch(endpoint, { headers });
       if (res.ok) {
         const data = await res.json();
         setSources(data.sources || []);
@@ -197,7 +217,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   const fetchHistory = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch('/api/rag/query/history', { headers });
+      const endpoint = notebookId
+        ? `/api/rag/query/history?notebookId=${notebookId}`
+        : '/api/rag/query/history';
+      const res = await fetch(endpoint, { headers });
       if (res.ok) {
         const data = await res.json();
         const history: ChatMessage[] = data.messages || [];
@@ -217,7 +240,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
   useEffect(() => {
     fetchSources();
     fetchHistory();
-  }, []);
+  }, [notebookId]);
 
   // Keyboard shortcut listener (Esc closes modal)
   useEffect(() => {
@@ -240,7 +263,7 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
     }, 3000);
 
     return () => clearInterval(timer);
-  }, [sources]);
+  }, [sources, notebookId]);
 
   // Handle URL Source Upload
   const handleAddUrlSource = async (e: React.FormEvent) => {
@@ -258,7 +281,8 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
         headers,
         body: JSON.stringify({
           url: urlInput,
-          type: urlKind
+          type: urlKind,
+          ...(notebookId ? { notebookId } : {})
         })
       });
 
@@ -288,6 +312,9 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
       const headers = await getAuthHeaders();
       const formData = new FormData();
       formData.append('file', selectedFile);
+      if (notebookId) {
+        formData.append('notebookId', notebookId);
+      }
 
       const res = await fetch('/api/rag/sources/file', {
         method: 'POST',
@@ -352,7 +379,10 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
       const res = await fetch('/api/rag/query', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ message: userMessageText })
+        body: JSON.stringify({
+          message: userMessageText,
+          ...(notebookId ? { notebookId } : {})
+        })
       });
 
       const data = await res.json();
@@ -400,24 +430,25 @@ export const WorkspacePage: React.FC<WorkspacePageProps> = ({ onBackToHome }) =>
       {/* ── TOP NAVBAR ────────────────────────────────────────────────── */}
       <header className="h-16 border-b border-white/10 bg-[#08080a] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0">
         
-        {/* Left: Workspace Title */}
+        {/* Left: Navigation & Workspace Title */}
         <div className="flex items-center space-x-3">
           <button 
-            onClick={onBackToHome}
-            className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white transition-colors cursor-pointer"
-            title="Back to Landing Page"
+            onClick={onBackToDashboard || onBackToHome}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white transition-colors cursor-pointer text-xs font-mono"
+            title="Back to Notebooks Dashboard"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Notebooks</span>
           </button>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 pl-2 border-l border-white/10">
             <div className="w-8 h-8 rounded-xl bg-white text-black flex items-center justify-center font-bold">
               <Terminal className="w-4 h-4" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center space-x-2">
-                <span className="font-mono font-bold text-white text-sm">{notebookTitle}</span>
-                <span className="text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-zinc-300 border border-white/10">
+                <span className="font-mono font-bold text-white text-sm truncate max-w-[200px] md:max-w-[300px]">{notebookTitle}</span>
+                <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
                   NotebookLM
                 </span>
               </div>
